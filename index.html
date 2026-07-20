@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>عملاء الواتساب - مركز نورسين المتطور</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
+                    colors: {
+                        'green-light': '#d1fae5',
+                        'orange-middle': '#f59e0b',
+                        'sky-blue': '#06b6d4',
+                        'dark-blue': '#0e2a47',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Cairo', sans-serif;
+            background: #f0fdf4;
+        }
+        .card {
+            transition: all 0.3s ease;
+            border: 1px solid #e5e7eb;
+            position: relative;
+        }
+        .card:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+        }
+        .card.sent {
+            border-right: 5px solid #06b6d4;
+            background: #ecfdf5;
+        }
+        .card.sending {
+            border-right: 5px solid #f59e0b;
+            background: #fef3c7;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .btn-primary {
+            background: #f59e0b;
+            color: white;
+            transition: all 0.2s;
+        }
+        .btn-primary:hover {
+            background: #d97706;
+            transform: scale(1.02);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-sky {
+            background: #06b6d4;
+            color: white;
+            transition: all 0.2s;
+        }
+        .btn-sky:hover {
+            background: #0891b2;
+            transform: scale(1.02);
+        }
+        .btn-sky:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .btn-success {
+            background: #10b981;
+            color: white;
+            transition: all 0.2s;
+        }
+        .btn-success:hover {
+            background: #059669;
+            transform: scale(1.02);
+        }
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+            transition: all 0.2s;
+        }
+        .btn-danger:hover {
+            background: #dc2626;
+            transform: scale(1.02);
+        }
+        .btn-danger:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .progress-bar {
+            background: #e5e7eb;
+            border-radius: 50px;
+            overflow: hidden;
+            height: 12px;
+        }
+        .progress-fill {
+            background: linear-gradient(90deg, #06b6d4, #f59e0b);
+            height: 100%;
+            transition: width 0.5s ease;
+            border-radius: 50px;
+        }
+        .filter-btn {
+            transition: all 0.2s;
+            border: 2px solid transparent;
+            cursor: pointer;
+        }
+        .filter-btn.active {
+            border-color: #f59e0b;
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .pagination-btn {
+            transition: all 0.2s;
+            border: 1px solid #e5e7eb;
+            padding: 6px 14px;
+            border-radius: 8px;
+            background: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .pagination-btn:hover:not(:disabled) {
+            background: #f59e0b;
+            color: white;
+            border-color: #f59e0b;
+        }
+        .pagination-btn.active {
+            background: #06b6d4;
+            color: white;
+            border-color: #06b6d4;
+        }
+        .pagination-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #06b6d4; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0891b2; }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 50px;
+            font-size: 10px;
+            font-weight: 900;
+        }
+        .status-badge.sent {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-badge.sending {
+            background: #fef3c7;
+            color: #d97706;
+            animation: pulse 1s ease-in-out infinite;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0e2a47;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 16px;
+            font-weight: bold;
+            z-index: 9999;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            transition: all 0.5s ease;
+        }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+        .toast.warning { background: #f59e0b; }
+        .toast.info { background: #06b6d4; }
+        .firebase-status {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 6px;
+        }
+        .firebase-status.online { background: #10b981; }
+        .firebase-status.offline { background: #ef4444; }
+
+        @media (max-width: 640px) {
+            .grid-cols-1.md\:grid-cols-2.lg\:grid-cols-3.xl\:grid-cols-4 {
+                grid-template-columns: 1fr !important;
+            }
+            .flex-col.md\:flex-row {
+                flex-direction: column !important;
+            }
+            .gap-4 {
+                gap: 0.5rem !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ======================== HEADER ======================== -->
+<header class="bg-white shadow-md border-b-4 border-orange-middle sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="w-12 h-12 bg-green-light rounded-2xl flex items-center justify-center">
+                <i class="fa-brands fa-whatsapp text-3xl text-[#25D366]"></i>
+            </div>
+            <div>
+                <h1 class="text-xl md:text-2xl font-black text-dark-blue flex items-center gap-2">
+                    عملاء الواتساب
+                    <span class="text-sm bg-orange-middle text-white px-3 py-1 rounded-full text-[10px]">مركز نورسين المتطور</span>
+                </h1>
+                <p class="text-xs text-slate-500 font-medium">
+                    منصة التواصل الذكية - تعمل مع واتساب الهاتف
+                    <span id="firebaseStatus" class="mr-2">
+                        <span class="firebase-status online" id="statusDot"></span>
+                        <span class="text-[10px]" id="statusText">متصل</span>
+                    </span>
+                </p>
+            </div>
+        </div>
+        
+        <div class="flex items-center gap-4 bg-green-light/30 px-4 py-2 rounded-2xl">
+            <div class="text-center px-3 border-l border-slate-300">
+                <div class="text-xl font-black text-dark-blue" id="totalCount">0</div>
+                <div class="text-[10px] text-slate-500">الإجمالي</div>
+            </div>
+            <div class="text-center px-3 border-l border-slate-300">
+                <div class="text-xl font-black text-sky-blue" id="sentCount">0</div>
+                <div class="text-[10px] text-slate-500">تم الإرسال</div>
+            </div>
+            <div class="text-center px-3">
+                <div class="text-xl font-black text-orange-middle" id="pendingCount">0</div>
+                <div class="text-[10px] text-slate-500">متبقي</div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- ======================== MAIN ======================== -->
+<main class="max-w-7xl mx-auto px-4 py-6">
+
+    <!-- ====== شريط التقدم ====== -->
+    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 mb-6">
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="flex-1 w-full">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-bold text-sm text-slate-700">
+                        <i class="fa-solid fa-chart-line text-sky-blue ml-1"></i>
+                        نسبة الإنجاز
+                    </span>
+                    <span class="font-black text-sky-blue" id="progressPercent">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+                </div>
+                <div class="flex justify-between mt-1 text-[10px] text-slate-400">
+                    <span id="progressText">0 / 0 تم الإرسال</span>
+                    <span id="currentClient">في انتظار البدء</span>
+                </div>
+            </div>
+            
+            <!-- أزرار الإرسال الجماعي -->
+            <div class="flex flex-wrap gap-2 items-center">
+                <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                    <label class="text-xs font-bold text-slate-600">العدد:</label>
+                    <input type="number" id="batchSize" value="5" min="1" max="20" class="w-14 p-1 border rounded-lg text-center text-sm font-bold">
+                </div>
+                <div class="flex items-center gap-2 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                    <label class="text-xs font-bold text-slate-600">المدة (دق):</label>
+                    <input type="number" id="delayMinutes" value="3" min="1" max="10" class="w-14 p-1 border rounded-lg text-center text-sm font-bold">
+                </div>
+                <button onclick="startBatchSending()" id="startBatchBtn" class="btn-primary px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-play"></i> بدء الإرسال
+                </button>
+                <button onclick="pauseBatchSending()" id="pauseBatchBtn" class="btn-sky px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2" disabled>
+                    <i class="fa-solid fa-pause"></i> إيقاف مؤقت
+                </button>
+                <button onclick="stopBatchSending()" id="stopBatchBtn" class="btn-danger px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2" disabled>
+                    <i class="fa-solid fa-stop"></i> إيقاف
+                </button>
+            </div>
+        </div>
+        
+        <!-- حالة الإرسال -->
+        <div id="batchStatus" class="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200 hidden">
+            <div class="flex items-center justify-between text-sm">
+                <span class="font-bold text-slate-700">
+                    <i class="fa-solid fa-spinner fa-spin text-orange-middle ml-2"></i>
+                    جاري الإرسال...
+                </span>
+                <span class="font-bold text-sky-blue" id="batchProgress">0 / 0</span>
+            </div>
+            <div class="mt-1 flex flex-wrap justify-between text-xs text-slate-500">
+                <span id="currentSending">العميل الحالي: -</span>
+                <span id="timeRemaining">الوقت المتبقي: -</span>
+            </div>
+            <div class="mt-2 text-[10px] text-slate-400 bg-white p-2 rounded-lg border border-slate-100">
+                💡 تذكر: افتح واتساب على هاتفك قبل البدء، واترك التطبيق مفتوحاً
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== رسالة جماعية ====== -->
+    <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 mb-6">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 mb-3">
+            <h3 class="font-black text-dark-blue flex items-center gap-2">
+                <i class="fa-solid fa-pen-fancy text-orange-middle"></i>
+                رسالة التواصل الجماعية
+            </h3>
+            <div class="flex gap-2">
+                <button onclick="resetMessage()" class="text-xs font-bold text-slate-500 hover:text-sky-blue bg-slate-100 px-3 py-1.5 rounded-lg transition">
+                    <i class="fa-solid fa-rotate-right ml-1"></i> استعادة
+                </button>
+            </div>
+        </div>
+        <textarea id="messageTemplate" rows="3" class="w-full p-4 border-2 border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-sky-blue focus:border-sky-blue bg-green-light/20" placeholder="اكتب رسالتك هنا..."></textarea>
+        <div class="mt-2 flex flex-wrap items-start gap-2 bg-sky-blue/10 p-3 rounded-lg border border-sky-blue/20">
+            <i class="fa-solid fa-circle-info text-sky-blue mt-0.5"></i>
+            <p class="text-xs font-bold leading-relaxed text-slate-700">
+                استخدم <span class="bg-white px-2 py-0.5 rounded text-sky-blue border border-sky-blue/30 font-black">[الاسم]</span> لاستبداله باسم العميل، 
+                و <span class="bg-white px-2 py-0.5 rounded text-orange-middle border border-orange-middle/30 font-black">[الدولة]</span> لاستبدالها باسم الدولة.
+            </p>
+        </div>
+    </div>
+
+    <!-- ====== البحث والفلترة ====== -->
+    <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-6">
+        <div class="flex flex-col md:flex-row gap-4">
+            <div class="flex-1">
+                <div class="relative">
+                    <i class="fa-solid fa-search absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    <input type="text" id="searchInput" class="w-full pr-10 pl-4 py-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-blue focus:border-sky-blue outline-none bg-green-light/10" placeholder="🔍 ابحث بالرقم أو الدولة...">
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <label class="text-sm font-bold text-slate-600 whitespace-nowrap">
+                    <i class="fa-solid fa-filter ml-1"></i> الدولة:
+                </label>
+                <select id="countrySelect" class="w-full md:w-56 p-3 border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-sky-blue focus:border-sky-blue outline-none bg-white text-sm font-bold">
+                    <option value="all">🌍 جميع الدول</option>
+                </select>
+            </div>
+        </div>
+        <div class="flex gap-2 mt-3 flex-wrap">
+            <button class="filter-btn active px-4 py-2 rounded-xl text-sm font-bold bg-green-light text-dark-blue" data-filter="all">
+                <i class="fa-solid fa-globe ml-1"></i> الكل
+            </button>
+            <button class="filter-btn px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-green-light" data-filter="pending">
+                <i class="fa-regular fa-clock ml-1"></i> في الانتظار
+            </button>
+            <button class="filter-btn px-4 py-2 rounded-xl text-sm font-bold bg-white text-slate-600 hover:bg-green-light" data-filter="sent">
+                <i class="fa-regular fa-circle-check ml-1"></i> تم الإرسال
+            </button>
+            <button onclick="syncWithFirebase()" class="btn-sky px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up ml-1"></i> مزامنة
+            </button>
+        </div>
+    </div>
+
+    <!-- ====== بطاقات العملاء ====== -->
+    <div id="cardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        <!-- يتم الحقن بواسطة JavaScript -->
+    </div>
+
+    <!-- ====== الترقيم ====== -->
+    <div class="mt-6 flex justify-center items-center gap-2 flex-wrap" id="paginationControls">
+        <!-- يتم الحقن بواسطة JavaScript -->
+    </div>
+
+</main>
+
+<!-- ======================== FOOTER ======================== -->
+<footer class="bg-dark-blue text-white mt-10 py-6">
+    <div class="max-w-7xl mx-auto px-4 text-center">
+        <p class="text-sm font-bold">
+            <i class="fa-regular fa-copyright ml-1"></i> 2026 مركز نورسين المتطور - جميع الحقوق محفوظة
+        </p>
+        <p class="text-xs text-slate-400 mt-1">منصة التواصل الذكية - تعمل مع واتساب الهاتف</p>
+    </div>
+</footer>
+
+<!-- ========================================================== -->
+<!-- ======================== JAVASCRIPT ======================== -->
+<!-- ========================================================== -->
+<script>
+    // ============================================================
+    // 0. إعداد Firebase - ضع إعداداتك هنا!
+    // ============================================================
+   // ============================================================
+// 0. إعداد Firebase - باستخدام إعداداتك
+// ============================================================
+const firebaseConfig = {
+    apiKey: "AIzaSyAAM8ehkF8ofuIAn5WxvWQFJgQfbyQwmrU",
+    authDomain: "whatsapp-clients.firebaseapp.com",
+    databaseURL: "https://whatsapp-clients-default-rtdb.firebaseio.com",
+    projectId: "whatsapp-clients",
+    storageBucket: "whatsapp-clients.firebasestorage.app",
+    messagingSenderId: "36464667507",
+    appId: "1:36464667507:web:e8e9bb8a1f5a6c69537306",
+    measurementId: "G-04TGXD4JFM"
+};
+
+    // تهيئة Firebase
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    let firebaseReady = false;
+    let isSyncing = false;
+
+    // ============================================================
+    // 1. تحميل البيانات من ملف JSON
+    // ============================================================
+    let rawData = [];
+    let isLoading = true;
+
+    async function loadData() {
+        try {
+            const response = await fetch('data.json');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const jsonData = await response.json();
+            
+            rawData = jsonData.map((item, index) => {
+                const countryName = item.CountryName || 'غير معروف';
+                const defaultName = `عميل ${countryName}`;
+                
+                return {
+                    country: countryName,
+                    phone: String(item['Phone Number'] || ''),
+                    name: defaultName
+                };
+            });
+            
+            rawData = rawData.filter(item => item.phone && item.phone.length > 0);
+            
+            isLoading = false;
+            showToast(`✅ تم تحميل ${rawData.length} عميل بنجاح`, 'success');
+            
+            // تحميل التقدم من Firebase أولاً
+            await loadProgressFromFirebase();
+            
+            render();
+            renderCountryFilters();
+            restoreSession();
+            
+        } catch (error) {
+            console.error('Error loading data:', error);
+            isLoading = false;
+            showToast(`❌ خطأ في تحميل البيانات: ${error.message}`, 'error');
+            
+            document.getElementById('cardsContainer').innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid fa-triangle-exclamation text-3xl text-red-500"></i>
+                    </div>
+                    <p class="text-lg font-bold text-red-600">خطأ في تحميل البيانات</p>
+                    <p class="text-sm text-slate-500">${error.message}</p>
+                    <p class="text-sm text-slate-500 mt-2">تأكد من وجود ملف data.json في نفس المجلد</p>
+                    <button onclick="loadData()" class="btn-primary px-6 py-2 rounded-xl mt-4">
+                        <i class="fa-solid fa-rotate ml-2"></i> إعادة المحاولة
+                    </button>
+                </div>
+            `;
+        }
+    }
+
+    // ============================================================
+    // 2. دوال Firebase
+    // ============================================================
+    function updateFirebaseStatus(online) {
+        const dot = document.getElementById('statusDot');
+        const text = document.getElementById('statusText');
+        if (online) {
+            dot.className = 'firebase-status online';
+            text.textContent = 'متصل';
+        } else {
+            dot.className = 'firebase-status offline';
+            text.textContent = 'غير متصل';
+        }
+    }
+
+    // تحميل التقدم من Firebase
+    function loadProgressFromFirebase() {
+        return new Promise((resolve) => {
+            database.ref('progress').on('value', (snapshot) => {
+                const data = snapshot.val();
+                if (data) {
+                    // دمج البيانات من Firebase مع البيانات المحلية
+                    Object.keys(data).forEach(key => {
+                        if (data[key] === true) {
+                            sentState[key] = true;
+                        }
+                    });
+                    saveSentState();
+                    firebaseReady = true;
+                    updateFirebaseStatus(true);
+                    render();
+                    showToast('🔄 تم تحديث التقدم من السحابة', 'info');
+                } else {
+                    // إذا كانت Firebase فارغة، احفظ البيانات المحلية
+                    saveProgressToFirebase();
+                    firebaseReady = true;
+                    updateFirebaseStatus(true);
+                }
+                resolve();
+            }, (error) => {
+                console.error('Firebase error:', error);
+                updateFirebaseStatus(false);
+                resolve();
+            });
+        });
+    }
+
+    // حفظ التقدم إلى Firebase
+    function saveProgressToFirebase() {
+        if (!firebaseReady) return;
+        database.ref('progress').set(sentState)
+            .then(() => {
+                console.log('✅ تم حفظ التقدم في Firebase');
+            })
+            .catch((err) => {
+                console.error('❌ خطأ في حفظ Firebase:', err);
+                updateFirebaseStatus(false);
+            });
+    }
+
+    // مزامنة يدوية
+    function syncWithFirebase() {
+        if (isSyncing) return;
+        isSyncing = true;
+        showToast('🔄 جاري المزامنة مع السحابة...', 'info');
+        
+        // تحميل من Firebase
+        database.ref('progress').once('value').then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                Object.keys(data).forEach(key => {
+                    if (data[key] === true) {
+                        sentState[key] = true;
+                    }
+                });
+                saveSentState();
+                render();
+                showToast('✅ تمت المزامنة بنجاح', 'success');
+            } else {
+                // إذا كانت Firebase فارغة، احفظ البيانات المحلية
+                saveProgressToFirebase();
+                showToast('✅ تم رفع التقدم إلى السحابة', 'success');
+            }
+            isSyncing = false;
+        }).catch((error) => {
+            showToast('❌ خطأ في المزامنة: ' + error.message, 'error');
+            isSyncing = false;
+        });
+    }
+
+    // ============================================================
+    // 3. دوال الحالة (تم الإرسال) - مع Firebase
+    // ============================================================
+    let sentState = JSON.parse(localStorage.getItem('noorseen_whatsapp_sent') || '{}');
+    let batchProgress = JSON.parse(localStorage.getItem('noorseen_batch_progress') || '{"currentIndex":0,"isPaused":false,"isRunning":false}');
+    
+    function saveSentState() {
+        localStorage.setItem('noorseen_whatsapp_sent', JSON.stringify(sentState));
+        // حفظ في Firebase
+        saveProgressToFirebase();
+    }
+    
+    function saveBatchProgress() {
+        localStorage.setItem('noorseen_batch_progress', JSON.stringify(batchProgress));
+    }
+
+    function isSent(id) {
+        return sentState[id] === true;
+    }
+
+    function toggleSent(id) {
+        sentState[id] = !sentState[id];
+        saveSentState();
+        render();
+    }
+
+    // ============================================================
+    // 4. إعدادات العرض
+    // ============================================================
+    const ITEMS_PER_PAGE = 24;
+    let currentPage = 1;
+    let currentFilter = 'all';
+    let currentCountry = 'all';
+    let searchQuery = '';
+
+    let countries = [];
+
+    const defaultMessage = 'مرحباً [الاسم]، يتواصل معك مركز نورسين المتطور. لدينا عرض خاص لك في دولة [الدولة]!';
+
+    // ============================================================
+    // 5. متغيرات الإرسال الجماعي
+    // ============================================================
+    let batchTimer = null;
+    let isBatchRunning = false;
+    let isBatchPaused = false;
+    let batchTotal = 0;
+    let batchSent = 0;
+    let currentClientIndex = 0;
+    let batchFilteredData = [];
+
+    // ============================================================
+    // 6. دوال التصفية
+    // ============================================================
+    function getFilteredData() {
+        let data = rawData.map((item, index) => ({
+            ...item,
+            _id: `client_${index}`,
+            _sent: isSent(`client_${index}`)
+        }));
+
+        if (currentCountry !== 'all') {
+            data = data.filter(item => item.country === currentCountry);
+        }
+
+        if (currentFilter === 'sent') {
+            data = data.filter(item => item._sent);
+        } else if (currentFilter === 'pending') {
+            data = data.filter(item => !item._sent);
+        }
+
+        if (searchQuery.trim() !== '') {
+            const q = searchQuery.trim().toLowerCase();
+            data = data.filter(item => 
+                item.phone.includes(q) || 
+                item.country.toLowerCase().includes(q) ||
+                (item.name && item.name.toLowerCase().includes(q))
+            );
+        }
+
+        return data;
+    }
+
+    // ============================================================
+    // 7. العرض الرئيسي
+    // ============================================================
+    function render() {
+        if (isLoading) {
+            document.getElementById('cardsContainer').innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <div class="w-20 h-20 bg-green-light rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl text-sky-blue"></i>
+                    </div>
+                    <p class="text-lg font-bold text-slate-600">جاري تحميل البيانات...</p>
+                    <p class="text-sm text-slate-400">يرجى الانتظار</p>
+                </div>
+            `;
+            return;
+        }
+
+        const filtered = getFilteredData();
+        const totalItems = filtered.length;
+        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+
+        if (currentPage > totalPages) currentPage = totalPages || 1;
+        if (currentPage < 1) currentPage = 1;
+
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE, totalItems);
+        const pageItems = filtered.slice(startIndex, endIndex);
+
+        const totalAll = rawData.length;
+        const totalSent = Object.values(sentState).filter(Boolean).length;
+        const totalPending = totalAll - totalSent;
+
+        document.getElementById('totalCount').textContent = totalAll;
+        document.getElementById('sentCount').textContent = totalSent;
+        document.getElementById('pendingCount').textContent = totalPending;
+
+        const percent = totalAll > 0 ? Math.round((totalSent / totalAll) * 100) : 0;
+        document.getElementById('progressPercent').textContent = percent + '%';
+        document.getElementById('progressFill').style.width = percent + '%';
+        document.getElementById('progressText').textContent = `${totalSent} / ${totalAll} تم الإرسال`;
+
+        const container = document.getElementById('cardsContainer');
+        if (pageItems.length === 0) {
+            container.innerHTML = `
+                <div class="col-span-full text-center py-16">
+                    <div class="w-20 h-20 bg-green-light rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fa-regular fa-face-smile text-3xl text-sky-blue"></i>
+                    </div>
+                    <p class="text-lg font-bold text-slate-600">لا توجد نتائج</p>
+                    <p class="text-sm text-slate-400">حاول تعديل البحث أو الفلترة</p>
+                </div>
+            `;
+        } else {
+            container.innerHTML = pageItems.map((item) => {
+                const sent = item._sent;
+                const isCurrentlySending = isBatchRunning && !isBatchPaused && 
+                    batchFilteredData[currentClientIndex] && 
+                    batchFilteredData[currentClientIndex]._id === item._id;
+
+                const waNumber = item.phone.replace(/\D/g, '');
+                const clientName = item.name || `عميل ${item.country}`;
+                const customMsg = messageTemplate
+                    .replace(/\[الاسم\]/g, clientName)
+                    .replace(/\[الدولة\]/g, item.country);
+                
+                const waLink = `https://wa.me/${waNumber}?text=${encodeURIComponent(customMsg)}`;
+
+                let statusBadge = '';
+                if (sent) {
+                    statusBadge = `<span class="status-badge sent"><i class="fa-regular fa-circle-check ml-1"></i> تم</span>`;
+                } else if (isCurrentlySending) {
+                    statusBadge = `<span class="status-badge sending"><i class="fa-solid fa-spinner fa-spin ml-1"></i> جاري</span>`;
+                } else {
+                    statusBadge = `<span class="status-badge pending"><i class="fa-regular fa-clock ml-1"></i> انتظار</span>`;
+                }
+
+                return `
+                    <div class="card rounded-2xl p-4 bg-white ${sent ? 'sent' : ''} ${isCurrentlySending ? 'sending' : ''}">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex-1">
+                                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                    <span class="bg-sky-blue/10 text-sky-blue text-[10px] font-black px-2 py-0.5 rounded-full">
+                                        <i class="fa-solid fa-flag ml-1"></i> ${item.country}
+                                    </span>
+                                    ${statusBadge}
+                                </div>
+                                <p class="font-bold text-sm text-slate-700">${clientName}</p>
+                                <p class="font-mono font-bold text-base text-slate-800" dir="ltr">${item.phone}</p>
+                            </div>
+                            <button onclick="toggleSent('${item._id}')" 
+                                    class="w-8 h-8 rounded-xl flex items-center justify-center transition border-2 ${sent ? 'border-sky-blue text-sky-blue bg-sky-blue/10' : 'border-slate-300 text-slate-400 hover:border-sky-blue'}" 
+                                    title="${sent ? 'تحديد كغير مرسل' : 'تحديد كمرسل'}">
+                                <i class="fa-solid ${sent ? 'fa-check-double' : 'fa-check'} text-xs"></i>
+                            </button>
+                        </div>
+                        <div class="flex gap-2 mt-3">
+                            <a href="${waLink}" 
+                               target="_blank" 
+                               onclick="markAsSent('${item._id}')"
+                               class="flex-1 btn-success py-2 px-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2">
+                                <i class="fa-brands fa-whatsapp"></i> إرسال
+                            </a>
+                            <button onclick="copyPhone('${item.phone}')" 
+                                    class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-3 py-2 rounded-xl text-sm transition">
+                                <i class="fa-regular fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        renderPagination(totalPages);
+        updateBatchStatus();
+    }
+
+    // ============================================================
+    // 8. الترقيم
+    // ============================================================
+    function renderPagination(totalPages) {
+        const controls = document.getElementById('paginationControls');
+        if (totalPages <= 1) {
+            controls.innerHTML = '';
+            return;
+        }
+
+        let html = `
+            <button class="pagination-btn" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                <i class="fa-solid fa-chevron-right"></i>
+            </button>
+        `;
+
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) {
+                html += `<button class="pagination-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+            }
+        } else {
+            html += `<button class="pagination-btn ${1 === currentPage ? 'active' : ''}" onclick="changePage(1)">1</button>`;
+            if (currentPage > 3) html += `<span class="text-slate-400">...</span>`;
+            for (let i = Math.max(2, currentPage - 1); i <= Math.min(totalPages - 1, currentPage + 1); i++) {
+                html += `<button class="pagination-btn ${i === currentPage ? 'active' : ''}" onclick="changePage(${i})">${i}</button>`;
+            }
+            if (currentPage < totalPages - 2) html += `<span class="text-slate-400">...</span>`;
+            html += `<button class="pagination-btn ${totalPages === currentPage ? 'active' : ''}" onclick="changePage(${totalPages})">${totalPages}</button>`;
+        }
+
+        html += `
+            <button class="pagination-btn" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                <i class="fa-solid fa-chevron-left"></i>
+            </button>
+            <span class="text-xs text-slate-500 mr-2">${currentPage} / ${totalPages}</span>
+        `;
+
+        controls.innerHTML = html;
+    }
+
+    function changePage(page) {
+        const filtered = getFilteredData();
+        const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+        if (page < 1 || page > totalPages) return;
+        currentPage = page;
+        render();
+    }
+
+    // ============================================================
+    // 9. دوال مساعدة
+    // ============================================================
+    function copyPhone(phone) {
+        navigator.clipboard.writeText(phone).then(() => {
+            showToast('✅ تم نسخ الرقم: ' + phone, 'success');
+        }).catch(() => {
+            const input = document.createElement('input');
+            input.value = phone;
+            document.body.appendChild(input);
+            input.select();
+            document.execCommand('copy');
+            document.body.removeChild(input);
+            showToast('✅ تم نسخ الرقم: ' + phone, 'success');
+        });
+    }
+
+    function markAsSent(id) {
+        if (!sentState[id]) {
+            sentState[id] = true;
+            saveSentState();
+            setTimeout(() => render(), 500);
+        }
+    }
+
+    function showToast(message, type = 'info') {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(20px)';
+            setTimeout(() => toast.remove(), 500);
+        }, 4000);
+    }
+
+    // ============================================================
+    // 10. إدارة الرسالة
+    // ============================================================
+    let messageTemplate = localStorage.getItem('noorseen_whatsapp_msg') || defaultMessage;
+    const msgInput = document.getElementById('messageTemplate');
+    msgInput.value = messageTemplate;
+
+    msgInput.addEventListener('input', function() {
+        messageTemplate = this.value;
+        localStorage.setItem('noorseen_whatsapp_msg', messageTemplate);
+        render();
+    });
+
+    function resetMessage() {
+        messageTemplate = defaultMessage;
+        msgInput.value = messageTemplate;
+        localStorage.setItem('noorseen_whatsapp_msg', messageTemplate);
+        render();
+        showToast('🔄 تم استعادة الرسالة الافتراضية', 'warning');
+    }
+
+    // ============================================================
+    // 11. الإرسال الجماعي
+    // ============================================================
+    function startBatchSending() {
+        const filtered = getFilteredData();
+        const pending = filtered.filter(item => !item._sent);
+        
+        if (pending.length === 0) {
+            showToast('🎉 جميع العملاء تم إرسال الرسائل لهم!', 'success');
+            return;
+        }
+
+        showToast('📱 تأكد من فتح واتساب على هاتفك', 'info');
+
+        const batchSize = parseInt(document.getElementById('batchSize').value) || 5;
+        const targetCount = Math.min(batchSize, pending.length);
+        
+        batchFilteredData = pending.slice(0, targetCount);
+        batchTotal = batchFilteredData.length;
+        batchSent = 0;
+        currentClientIndex = 0;
+        
+        if (batchProgress.currentIndex > 0 && batchProgress.isRunning) {
+            currentClientIndex = batchProgress.currentIndex;
+            batchSent = currentClientIndex;
+            showToast(`🔄 استكمال الإرسال من العميل رقم ${currentClientIndex + 1}`, 'info');
+        } else {
+            batchProgress.currentIndex = 0;
+            batchProgress.isRunning = true;
+            batchProgress.isPaused = false;
+            saveBatchProgress();
+        }
+
+        isBatchRunning = true;
+        isBatchPaused = false;
+        
+        document.getElementById('startBatchBtn').disabled = true;
+        document.getElementById('pauseBatchBtn').disabled = false;
+        document.getElementById('stopBatchBtn').disabled = false;
+        document.getElementById('batchStatus').classList.remove('hidden');
+        
+        showToast(`🚀 بدء الإرسال لـ ${batchTotal} عميل`, 'info');
+        
+        sendNextBatchPhone();
+    }
+
+    function sendNextBatchPhone() {
+        if (!isBatchRunning || isBatchPaused) return;
+        if (currentClientIndex >= batchTotal) {
+            finishBatch();
+            return;
+        }
+
+        const item = batchFilteredData[currentClientIndex];
+        const waNumber = item.phone.replace(/\D/g, '');
+        const clientName = item.name || `عميل ${item.country}`;
+        const customMsg = messageTemplate
+            .replace(/\[الاسم\]/g, clientName)
+            .replace(/\[الدولة\]/g, item.country);
+        
+        const waLink = `https://wa.me/${waNumber}?text=${encodeURIComponent(customMsg)}`;
+
+        window.open(waLink, '_blank');
+        
+        const id = `client_${rawData.indexOf(item)}`;
+        sentState[id] = true;
+        batchSent++;
+        currentClientIndex++;
+        
+        batchProgress.currentIndex = currentClientIndex;
+        saveBatchProgress();
+        saveSentState();
+        
+        render();
+        updateBatchStatus();
+        document.getElementById('currentSending').textContent = `العميل الحالي: ${clientName} (${item.country})`;
+        
+        const delayMinutes = parseInt(document.getElementById('delayMinutes').value) || 3;
+        const remaining = batchTotal - currentClientIndex;
+        const remainingMinutes = remaining * delayMinutes;
+        document.getElementById('timeRemaining').textContent = `الوقت المتبقي: ~${remainingMinutes} دقيقة`;
+        
+        showToast(`⏳ انتظر ${delayMinutes} دقائق قبل الرسالة التالية`, 'warning');
+        
+        const delayMs = delayMinutes * 60 * 1000;
+        batchTimer = setTimeout(sendNextBatchPhone, delayMs);
+    }
+
+    function pauseBatchSending() {
+        if (!isBatchRunning) return;
+        isBatchPaused = true;
+        batchProgress.isPaused = true;
+        saveBatchProgress();
+        
+        if (batchTimer) {
+            clearTimeout(batchTimer);
+            batchTimer = null;
+        }
+        
+        document.getElementById('pauseBatchBtn').disabled = true;
+        document.getElementById('startBatchBtn').disabled = false;
+        document.getElementById('startBatchBtn').innerHTML = '<i class="fa-solid fa-play"></i> استكمال';
+        
+        showToast(`⏸️ تم إيقاف الإرسال مؤقتاً - استكملت ${batchSent} من ${batchTotal}`, 'warning');
+        updateBatchStatus();
+    }
+
+    function stopBatchSending() {
+        if (!isBatchRunning) return;
+        
+        if (!confirm('هل أنت متأكد من إيقاف الإرسال؟ سيتم حفظ التقدم.')) return;
+        
+        isBatchRunning = false;
+        isBatchPaused = false;
+        
+        if (batchTimer) {
+            clearTimeout(batchTimer);
+            batchTimer = null;
+        }
+        
+        batchProgress.isRunning = false;
+        batchProgress.isPaused = false;
+        saveBatchProgress();
+        
+        document.getElementById('startBatchBtn').disabled = false;
+        document.getElementById('startBatchBtn').innerHTML = '<i class="fa-solid fa-play"></i> بدء الإرسال';
+        document.getElementById('pauseBatchBtn').disabled = true;
+        document.getElementById('stopBatchBtn').disabled = true;
+        document.getElementById('batchStatus').classList.add('hidden');
+        
+        showToast(`⏹️ تم إيقاف الإرسال - تم إرسال ${batchSent} من ${batchTotal}`, 'error');
+        render();
+    }
+
+    function finishBatch() {
+        isBatchRunning = false;
+        isBatchPaused = false;
+        
+        batchProgress.isRunning = false;
+        batchProgress.isPaused = false;
+        batchProgress.currentIndex = 0;
+        saveBatchProgress();
+        
+        document.getElementById('startBatchBtn').disabled = false;
+        document.getElementById('startBatchBtn').innerHTML = '<i class="fa-solid fa-play"></i> بدء الإرسال';
+        document.getElementById('pauseBatchBtn').disabled = true;
+        document.getElementById('stopBatchBtn').disabled = true;
+        document.getElementById('batchStatus').classList.add('hidden');
+        
+        showToast(`✅ اكتمل الإرسال! تم إرسال ${batchTotal} رسالة`, 'success');
+        render();
+    }
+
+    function updateBatchStatus() {
+        if (!isBatchRunning && !isBatchPaused) {
+            document.getElementById('batchStatus').classList.add('hidden');
+            return;
+        }
+        
+        document.getElementById('batchStatus').classList.remove('hidden');
+        document.getElementById('batchProgress').textContent = `${batchSent} / ${batchTotal}`;
+        
+        if (isBatchPaused) {
+            document.getElementById('currentSending').textContent = '⏸️ متوقف مؤقتاً';
+        }
+    }
+
+    // ============================================================
+    // 12. استعادة الجلسة
+    // ============================================================
+    function restoreSession() {
+        if (isLoading || rawData.length === 0) return;
+        
+        if (batchProgress.isRunning && batchProgress.currentIndex > 0) {
+            const filtered = getFilteredData();
+            const pending = filtered.filter(item => !item._sent);
+            
+            if (pending.length > 0) {
+                const remaining = pending.length;
+                showToast(`🔄 يوجد ${remaining} عميل متبقي من الجلسة السابقة`, 'info');
+                
+                document.getElementById('startBatchBtn').innerHTML = '<i class="fa-solid fa-play"></i> استكمال';
+                document.getElementById('startBatchBtn').disabled = false;
+            }
+        }
+    }
+
+    // ============================================================
+    // 13. البحث والفلترة
+    // ============================================================
+    document.getElementById('searchInput').addEventListener('input', function() {
+        searchQuery = this.value;
+        currentPage = 1;
+        render();
+    });
+
+    function renderCountryFilters() {
+        if (isLoading || rawData.length === 0) {
+            document.getElementById('countrySelect').innerHTML = `
+                <option value="all">🌍 جاري التحميل...</option>
+            `;
+            return;
+        }
+
+        countries = [...new Set(rawData.map(item => item.country).filter(Boolean))];
+        
+        const select = document.getElementById('countrySelect');
+        let html = `<option value="all">🌍 جميع الدول</option>`;
+        
+        countries.forEach(country => {
+            const count = rawData.filter(item => item.country === country).length;
+            html += `
+                <option value="${country}">
+                    🏳️ ${country} (${count})
+                </option>
+            `;
+        });
+        
+        select.innerHTML = html;
+
+        select.addEventListener('change', function() {
+            currentCountry = this.value;
+            currentPage = 1;
+            render();
+        });
+    }
+
+    document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(b => {
+                b.classList.remove('bg-green-light', 'text-dark-blue');
+                b.classList.add('bg-white', 'text-slate-600');
+            });
+            this.classList.remove('bg-white', 'text-slate-600');
+            this.classList.add('bg-green-light', 'text-dark-blue');
+            
+            currentFilter = this.dataset.filter;
+            currentPage = 1;
+            render();
+        });
+    });
+
+    // ============================================================
+    // 14. التشغيل
+    // ============================================================
+    loadData().then(() => {
+        renderCountryFilters();
+        render();
+        restoreSession();
+    });
+
+    render();
+
+    // حفظ التقدم كل 10 ثواني
+    setInterval(() => {
+        if (isBatchRunning) {
+            saveBatchProgress();
+            saveSentState();
+        }
+    }, 10000);
+
+    window.addEventListener('beforeunload', function(e) {
+        if (isBatchRunning && !isBatchPaused) {
+            e.preventDefault();
+            e.returnValue = '⚠️ الإرسال لا يزال قيد التشغيل. هل أنت متأكد من الإغلاق؟';
+        }
+    });
+</script>
+
+</body>
+</html>

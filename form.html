@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل بيانات العميل - نورسين</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Cairo', 'sans-serif'] },
+                    colors: {
+                        'green-light': '#d1fae5',
+                        'orange-middle': '#f59e0b',
+                        'sky-blue': '#06b6d4',
+                        'dark-blue': '#0e2a47',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Cairo', sans-serif; background: #f0fdf4; }
+        .form-card {
+            max-width: 600px;
+            margin: 30px auto;
+            background: white;
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+            border: 1px solid #e5e7eb;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e5e7eb;
+            border-radius: 14px;
+            font-size: 15px;
+            transition: all 0.3s;
+            font-family: 'Cairo', sans-serif;
+            background: white;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: #06b6d4;
+            box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.1);
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 6px;
+        }
+        .form-label .required {
+            color: #ef4444;
+            margin-right: 4px;
+        }
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: 'Cairo', sans-serif;
+        }
+        .btn-submit:hover {
+            background: #059669;
+            transform: scale(1.02);
+        }
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0e2a47;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 16px;
+            font-weight: bold;
+            z-index: 9999;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            transition: all 0.5s ease;
+        }
+        .toast.success { background: #10b981; }
+        .toast.error { background: #ef4444; }
+        .toast.warning { background: #f59e0b; }
+        .toast.info { background: #06b6d4; }
+        .section-title {
+            font-size: 16px;
+            font-weight: 900;
+            color: #0e2a47;
+            border-right: 4px solid #f59e0b;
+            padding-right: 12px;
+            margin-bottom: 16px;
+            margin-top: 20px;
+        }
+        .phone-display {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 14px;
+            text-align: center;
+            font-size: 20px;
+            font-weight: 900;
+            margin-bottom: 24px;
+        }
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+        /* اللوغو */
+        .logo-container {
+            width: 70px;
+            height: 70px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin: 0 auto 12px;
+            background: white;
+            border: 2px solid #e5e7eb;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .logo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            padding: 6px;
+        }
+        @media (max-width: 640px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            .form-card {
+                padding: 20px;
+                margin: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="form-card">
+    <!-- الشعار مع الصورة -->
+    <div class="text-center mb-4">
+        <div class="logo-container">
+            <img src="logo.png" alt="شعار نورسين" id="logoImage" onerror="this.style.display='none'; document.getElementById('logoFallback').style.display='flex'">
+            <!-- في حال عدم وجود الصورة -->
+            <div id="logoFallback" class="w-full h-full bg-green-light rounded-2xl flex items-center justify-center" style="display:none;">
+                <i class="fa-brands fa-whatsapp text-3xl text-[#25D366]"></i>
+            </div>
+        </div>
+        <h1 class="text-2xl font-black text-dark-blue">مركز نورسين المتطور</h1>
+        <p class="text-sm text-slate-500">استمارة تسجيل العميل</p>
+    </div>
+
+    <!-- رقم العميل -->
+    <div class="phone-display" id="clientPhoneDisplay">
+        <i class="fa-solid fa-phone ml-2"></i>
+        <span id="clientPhone">-</span>
+    </div>
+
+    <!-- استمارة التسجيل -->
+    <form id="clientForm" onsubmit="submitData(event)">
+
+        <!-- ====== القسم الأول: المعلومات الشخصية ====== -->
+        <div class="section-title"><i class="fa-regular fa-user ml-2"></i> المعلومات الشخصية</div>
+
+        <!-- الاسم -->
+        <div class="mb-4">
+            <label class="form-label">
+                <span class="required">*</span> الاسم الكامل
+            </label>
+            <input type="text" id="clientName" class="form-input" placeholder="أدخل اسمك الكامل..." required>
+        </div>
+
+        <!-- الجنس + العمر -->
+        <div class="form-row">
+            <div class="mb-4">
+                <label class="form-label">
+                    <span class="required">*</span> الجنس
+                </label>
+                <select id="clientGender" class="form-select" required>
+                    <option value="">اختر الجنس...</option>
+                    <option value="ذكر">ذكر</option>
+                    <option value="أنثى">أنثى</option>
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="form-label">
+                    <span class="required">*</span> العمر
+                </label>
+                <input type="number" id="clientAge" class="form-input" placeholder="مثال: 25" min="1" max="100" required>
+            </div>
+        </div>
+
+        <!-- الهاتف (يتم جلبه تلقائياً) + الدولة -->
+        <div class="form-row">
+            <div class="mb-4">
+                <label class="form-label">
+                    <span class="required">*</span> رقم الهاتف
+                </label>
+                <input type="text" id="clientPhoneInput" class="form-input" readonly style="background:#f1f5f9; cursor:not-allowed;">
+            </div>
+            <div class="mb-4">
+                <label class="form-label">
+                    <span class="required">*</span> الدولة
+                </label>
+                <input type="text" id="clientCountry" class="form-input" readonly style="background:#f1f5f9; cursor:not-allowed;">
+            </div>
+        </div>
+
+        <!-- المؤهل الدراسي -->
+        <div class="mb-4">
+            <label class="form-label">
+                <span class="required">*</span> المؤهل الدراسي
+            </label>
+            <select id="clientQualification" class="form-select" required>
+                <option value="">اختر المؤهل الدراسي...</option>
+                <option value="دكتوراه">دكتوراه</option>
+                <option value="ماجستير">ماجستير</option>
+                <option value="بكالوريوس">بكالوريوس</option>
+                <option value="دبلوم">دبلوم</option>
+                <option value="ثانوية عامة">ثانوية عامة</option>
+                <option value="أقل من ثانوية">أقل من ثانوية</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+
+        <!-- ====== القسم الثاني: مصدر العميل ====== -->
+        <div class="section-title"><i class="fa-regular fa-circle-question ml-2"></i> مصدر العميل</div>
+
+        <div class="mb-4">
+            <label class="form-label">
+                <span class="required">*</span> كيف عرفت عنا؟
+            </label>
+            <select id="clientSource" class="form-select" required>
+                <option value="">اختر المصدر...</option>
+                <option value="واتساب">واتساب</option>
+                <option value="فيسبوك">فيسبوك</option>
+                <option value="انستغرام">انستغرام</option>
+                <option value="تيك توك">تيك توك</option>
+                <option value="إعلان مدفوع">إعلان مدفوع</option>
+                <option value="صديق/معارف">صديق/معارف</option>
+                <option value="جوجل">جوجل</option>
+                <option value="إيميل">إيميل</option>
+                <option value="أخرى">أخرى</option>
+            </select>
+        </div>
+
+        <!-- ====== القسم الثالث: الكورس المهتم به ====== -->
+        <div class="section-title"><i class="fa-regular fa-graduation-cap ml-2"></i> الكورس المهتم به</div>
+
+        <div class="mb-4">
+            <label class="form-label">
+                <span class="required">*</span> اختر الكورس
+            </label>
+            <select id="clientCourse" class="form-select" required>
+                <option value="">اختر الكورس...</option>
+                <option value="كورس انطلاق للسوشيال ميديا و الذكاء الاصطناعي">🚀 كورس انطلاق للسوشيال ميديا و الذكاء الاصطناعي</option>
+                <option value="إدارة المشروعات PMP">📊 إدارة المشروعات PMP</option>
+                <option value="الماجستير المهني المصغر في إدارة الأعمال mini MBA">🎓 الماجستير المهني المصغر في إدارة الأعمال mini MBA</option>
+                <option value="اللغة الانجليزية ٦ مستويات">🌍 اللغة الانجليزية ٦ مستويات</option>
+                <option value="كورس أساسيات الشبكات">💻 كورس أساسيات الشبكات</option>
+                <option value="كورس الأمن السبراني">🔒 كورس الأمن السبراني</option>
+                <option value="الرخصة الدولية للحاسب الآلي ICDL">🖥️ الرخصة الدولية للحاسب الآلي ICDL</option>
+                <option value="تدريب المدربين TOT">🎯 تدريب المدربين TOT</option>
+                <option value="دبلوم المهني في إدارة الموارد البشرية">👥 دبلوم المهني في إدارة الموارد البشرية</option>
+                <option value="الدبلوم المهني في التسويق والمبيعات">📈 الدبلوم المهني في التسويق والمبيعات</option>
+                <option value="كورس الفحوصات الروتينية (الملاريا، البول، البراز)">🔬 كورس الفحوصات الروتينية (الملاريا، البول، البراز)</option>
+                <option value="كورس فحص الدم العام">🩸 كورس فحص الدم العام</option>
+                <option value="كورس بنك الدم">🏥 كورس بنك الدم</option>
+                <option value="كورس تحليل السائل المنوي">🔬 كورس تحليل السائل المنوي</option>
+                <option value="كورس مكافحة العدوى">🧼 كورس مكافحة العدوى</option>
+            </select>
+        </div>
+
+        <!-- ====== القسم الرابع: الفترة الزمنية ====== -->
+        <div class="section-title"><i class="fa-regular fa-calendar ml-2"></i> فترة البدء</div>
+
+        <div class="mb-4">
+            <label class="form-label">
+                <span class="required">*</span> متى ترغب في البدء؟
+            </label>
+            <select id="clientStartPeriod" class="form-select" required>
+                <option value="">اختر الفترة...</option>
+                <option value="الآن - جاهز للبدء فوراً">⚡ الآن - جاهز للبدء فوراً</option>
+                <option value="خلال شهر">📅 خلال شهر</option>
+                <option value="بعد شهر">📅 بعد شهر</option>
+                <option value="لم أحدد بعد">⏳ لم أحدد بعد</option>
+            </select>
+        </div>
+
+        <!-- ====== القسم الخامس: ملاحظات ====== -->
+        <div class="section-title"><i class="fa-regular fa-comment ml-2"></i> ملاحظات إضافية</div>
+
+        <div class="mb-6">
+            <textarea id="clientNotes" rows="3" class="form-input" placeholder="أي ملاحظات أو استفسارات إضافية..."></textarea>
+        </div>
+
+        <!-- زر الحفظ -->
+        <button type="submit" id="submitBtn" class="btn-submit">
+            <i class="fa-regular fa-floppy-disk ml-2"></i> حفظ البيانات
+        </button>
+    </form>
+
+    <p class="text-center text-xs text-slate-400 mt-4">
+        <i class="fa-regular fa-lock ml-1"></i> بياناتك آمنة ومشفرة
+    </p>
+</div>
+
+<!-- ========================================================== -->
+<!-- ======================== JAVASCRIPT ======================== -->
+<!-- ========================================================== -->
+<script>
+    // ============================================================
+    // 1. إعداد Firebase
+    // ============================================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyAAM8ehkF8ofuIAn5WxvWQFJgQfbyQwmrU",
+        authDomain: "whatsapp-clients.firebaseapp.com",
+        databaseURL: "https://whatsapp-clients-default-rtdb.firebaseio.com",
+        projectId: "whatsapp-clients",
+        storageBucket: "whatsapp-clients.firebasestorage.app",
+        messagingSenderId: "36464667507",
+        appId: "1:36464667507:web:e8e9bb8a1f5a6c69537306",
+        measurementId: "G-04TGXD4JFM"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // ============================================================
+    // 2. استخراج رقم العميل من الرابط
+    // ============================================================
+    function getPhoneFromURL() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('id') || params.get('phone') || null;
+    }
+
+    const phoneNumber = getPhoneFromURL();
+
+    // ============================================================
+    // 3. تحميل بيانات العميل من data.json
+    // ============================================================
+    let clientCountry = '';
+
+    async function loadClientData() {
+        try {
+            const response = await fetch('data.json');
+            const data = await response.json();
+            
+            const client = data.find(item => String(item['Phone Number']) === phoneNumber);
+            if (client) {
+                clientCountry = client.CountryName || 'غير معروف';
+            } else {
+                clientCountry = 'غير معروف';
+            }
+            
+            document.getElementById('clientCountry').value = clientCountry;
+        } catch (error) {
+            console.error('Error loading country:', error);
+            document.getElementById('clientCountry').value = 'غير معروف';
+        }
+    }
+
+    // ============================================================
+    // 4. عرض البيانات في النموذج
+    // ============================================================
+    if (phoneNumber) {
+        document.getElementById('clientPhone').textContent = phoneNumber;
+        document.getElementById('clientPhoneInput').value = phoneNumber;
+        loadClientData();
+        
+        // تحميل البيانات المحفوظة مسبقاً
+        database.ref('clients/' + phoneNumber).once('value').then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                if (data.name) document.getElementById('clientName').value = data.name;
+                if (data.gender) document.getElementById('clientGender').value = data.gender;
+                if (data.age) document.getElementById('clientAge').value = data.age;
+                if (data.qualification) document.getElementById('clientQualification').value = data.qualification;
+                if (data.source) document.getElementById('clientSource').value = data.source;
+                if (data.course) document.getElementById('clientCourse').value = data.course;
+                if (data.startPeriod) document.getElementById('clientStartPeriod').value = data.startPeriod;
+                if (data.notes) document.getElementById('clientNotes').value = data.notes;
+                showToast('📋 تم تحميل بياناتك السابقة', 'info');
+            }
+        });
+    } else {
+        document.getElementById('clientPhone').textContent = '⚠️ رابط غير صحيح';
+        document.getElementById('clientPhoneInput').value = '⚠️ رابط غير صحيح';
+        document.getElementById('submitBtn').disabled = true;
+        showToast('❌ رابط غير صحيح، يرجى استخدام الرابط المرسل من فريق نورسين', 'error');
+    }
+
+    // ============================================================
+    // 5. حفظ البيانات
+    // ============================================================
+    function submitData(event) {
+        event.preventDefault();
+        
+        if (!phoneNumber) {
+            showToast('❌ لا يمكن حفظ البيانات بدون رقم عميل', 'error');
+            return;
+        }
+
+        const name = document.getElementById('clientName').value.trim();
+        const gender = document.getElementById('clientGender').value;
+        const age = document.getElementById('clientAge').value.trim();
+        const qualification = document.getElementById('clientQualification').value;
+        const source = document.getElementById('clientSource').value;
+        const course = document.getElementById('clientCourse').value;
+        const startPeriod = document.getElementById('clientStartPeriod').value;
+        const notes = document.getElementById('clientNotes').value.trim();
+
+        // التحقق من الحقول المطلوبة
+        if (!name) { showToast('⚠️ يرجى إدخال الاسم الكامل', 'warning'); return; }
+        if (!gender) { showToast('⚠️ يرجى اختيار الجنس', 'warning'); return; }
+        if (!age) { showToast('⚠️ يرجى إدخال العمر', 'warning'); return; }
+        if (!qualification) { showToast('⚠️ يرجى اختيار المؤهل الدراسي', 'warning'); return; }
+        if (!source) { showToast('⚠️ يرجى اختيار مصدر العميل', 'warning'); return; }
+        if (!course) { showToast('⚠️ يرجى اختيار الكورس المهتم به', 'warning'); return; }
+        if (!startPeriod) { showToast('⚠️ يرجى اختيار فترة البدء', 'warning'); return; }
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin ml-2"></i> جاري الحفظ...';
+
+        const clientId = `client_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`;
+
+        const clientData = {
+            clientId: clientId,
+            name: name,
+            gender: gender,
+            age: age,
+            phone: phoneNumber,
+            country: clientCountry,
+            qualification: qualification,
+            source: source,
+            course: course,
+            startPeriod: startPeriod,
+            notes: notes,
+            registrationDate: new Date().toISOString(),
+            lastUpdate: new Date().toISOString(),
+            sourceType: 'whatsapp'
+        };
+
+        database.ref('clients/' + phoneNumber).set(clientData)
+            .then(() => {
+                showToast('✅ تم حفظ بياناتك بنجاح! شكراً لك', 'success');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-regular fa-floppy-disk ml-2"></i> حفظ البيانات';
+                
+                setTimeout(() => {
+                    document.getElementById('clientName').value = '';
+                    document.getElementById('clientGender').value = '';
+                    document.getElementById('clientAge').value = '';
+                    document.getElementById('clientQualification').value = '';
+                    document.getElementById('clientSource').value = '';
+                    document.getElementById('clientCourse').value = '';
+                    document.getElementById('clientStartPeriod').value = '';
+                    document.getElementById('clientNotes').value = '';
+                }, 5000);
+            })
+            .catch((error) => {
+                showToast('❌ خطأ في الحفظ: ' + error.message, 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-regular fa-floppy-disk ml-2"></i> حفظ البيانات';
+            });
+    }
+
+    // ============================================================
+    // 6. دالة التنبيهات
+    // ============================================================
+    function showToast(message, type = 'info') {
+        const existing = document.querySelector('.toast');
+        if (existing) existing.remove();
+        
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = message;
+        document.body.appendChild(toast);
+        
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(-50%) translateY(20px)';
+            setTimeout(() => toast.remove(), 500);
+        }, 4000);
+    }
+</script>
+
+</body>
+</html>
