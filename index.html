@@ -222,13 +222,14 @@
 <header class="bg-white shadow-md border-b-4 border-orange-middle sticky top-0 z-50">
     <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-3">
-            <div class="w-12 h-12 bg-green-light rounded-2xl flex items-center justify-center">
-                <i class="fa-brands fa-whatsapp text-3xl text-[#25D366]"></i>
+            <!-- ====== الشعار ====== -->
+            <div class="w-12 h-12 bg-green-light rounded-2xl flex items-center justify-center overflow-hidden">
+                <img src="logo.png" alt="الشعار" class="w-full h-full object-cover rounded-2xl">
             </div>
             <div>
                 <h1 class="text-xl md:text-2xl font-black text-dark-blue flex items-center gap-2">
                     عملاء الواتساب
-                    <span class="text-sm bg-orange-middle text-white px-3 py-1 rounded-full text-[10px]">مركز نورسين المتطور</span>
+                    <span class="text-sm bg-orange-middle text-white px-3 py-1 rounded-full text-[10px]">مركز نورسين للتدريب المتطور</span>
                 </h1>
                 <p class="text-xs text-slate-500 font-medium">
                     منصة التواصل الذكية - تعمل مع واتساب الهاتف
@@ -405,23 +406,19 @@
 <!-- ========================================================== -->
 <script>
     // ============================================================
-    // 0. إعداد Firebase - ضع إعداداتك هنا!
+    // 0. إعداد Firebase
     // ============================================================
-   // ============================================================
-// 0. إعداد Firebase - باستخدام إعداداتك
-// ============================================================
-const firebaseConfig = {
-    apiKey: "AIzaSyAAM8ehkF8ofuIAn5WxvWQFJgQfbyQwmrU",
-    authDomain: "whatsapp-clients.firebaseapp.com",
-    databaseURL: "https://whatsapp-clients-default-rtdb.firebaseio.com",
-    projectId: "whatsapp-clients",
-    storageBucket: "whatsapp-clients.firebasestorage.app",
-    messagingSenderId: "36464667507",
-    appId: "1:36464667507:web:e8e9bb8a1f5a6c69537306",
-    measurementId: "G-04TGXD4JFM"
-};
+    const firebaseConfig = {
+        apiKey: "AIzaSyAAM8ehkF8ofuIAn5WxvWQFJgQfbyQwmrU",
+        authDomain: "whatsapp-clients.firebaseapp.com",
+        databaseURL: "https://whatsapp-clients-default-rtdb.firebaseio.com",
+        projectId: "whatsapp-clients",
+        storageBucket: "whatsapp-clients.firebasestorage.app",
+        messagingSenderId: "36464667507",
+        appId: "1:36464667507:web:e8e9bb8a1f5a6c69537306",
+        measurementId: "G-04TGXD4JFM"
+    };
 
-    // تهيئة Firebase
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     let firebaseReady = false;
@@ -435,53 +432,55 @@ const firebaseConfig = {
 
     async function loadData() {
         try {
-            const response = await fetch('data.json');
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            const jsonData = await response.json();
+            console.log('🔄 1- بدء تحميل البيانات...');
             
-            rawData = jsonData.map((item, index) => {
-                const countryName = item.CountryName || 'غير معروف';
-                const defaultName = `عميل ${countryName}`;
-                
-                return {
-                    country: countryName,
-                    phone: String(item['Phone Number'] || ''),
-                    name: defaultName
-                };
-            });
+            const response = await fetch('data.json');
+            
+            console.log('🔄 2- حالة الخادم:', response.status);
+            
+            if (!response.ok) {
+                throw new Error(`فشل التحميل - الحالة: ${response.status}`);
+            }
+            
+            const jsonData = await response.json();
+            console.log('✅ 3- تم تحميل البيانات:', jsonData.length, 'عميل');
+            
+            rawData = jsonData.map((item) => ({
+                country: item.CountryName || 'غير معروف',
+                phone: String(item['Phone Number'] || ''),
+                name: `عميل ${item.CountryName || ''}`
+            }));
             
             rawData = rawData.filter(item => item.phone && item.phone.length > 0);
             
+            console.log('✅ 4- عدد العملاء الصالحين:', rawData.length);
+            
             isLoading = false;
-            showToast(`✅ تم تحميل ${rawData.length} عميل بنجاح`, 'success');
             
-            // تحميل التقدم من Firebase أولاً
-            await loadProgressFromFirebase();
-            
+            showToast(`✅ تم تحميل ${rawData.length} عميل`, 'success');
             render();
             renderCountryFilters();
             restoreSession();
             
         } catch (error) {
-            console.error('Error loading data:', error);
+            console.error('❌ خطأ في التحميل:', error);
             isLoading = false;
-            showToast(`❌ خطأ في تحميل البيانات: ${error.message}`, 'error');
             
             document.getElementById('cardsContainer').innerHTML = `
                 <div class="col-span-full text-center py-16">
                     <div class="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <i class="fa-solid fa-triangle-exclamation text-3xl text-red-500"></i>
                     </div>
-                    <p class="text-lg font-bold text-red-600">خطأ في تحميل البيانات</p>
+                    <p class="text-lg font-bold text-red-600">فشل تحميل البيانات</p>
                     <p class="text-sm text-slate-500">${error.message}</p>
-                    <p class="text-sm text-slate-500 mt-2">تأكد من وجود ملف data.json في نفس المجلد</p>
+                    <p class="text-xs text-slate-400 mt-2">تأكد من وجود ملف data.json في نفس المجلد</p>
                     <button onclick="loadData()" class="btn-primary px-6 py-2 rounded-xl mt-4">
                         <i class="fa-solid fa-rotate ml-2"></i> إعادة المحاولة
                     </button>
                 </div>
             `;
+            
+            showToast(`❌ فشل التحميل: ${error.message}`, 'error');
         }
     }
 
@@ -500,13 +499,11 @@ const firebaseConfig = {
         }
     }
 
-    // تحميل التقدم من Firebase
     function loadProgressFromFirebase() {
         return new Promise((resolve) => {
             database.ref('progress').on('value', (snapshot) => {
                 const data = snapshot.val();
                 if (data) {
-                    // دمج البيانات من Firebase مع البيانات المحلية
                     Object.keys(data).forEach(key => {
                         if (data[key] === true) {
                             sentState[key] = true;
@@ -518,7 +515,6 @@ const firebaseConfig = {
                     render();
                     showToast('🔄 تم تحديث التقدم من السحابة', 'info');
                 } else {
-                    // إذا كانت Firebase فارغة، احفظ البيانات المحلية
                     saveProgressToFirebase();
                     firebaseReady = true;
                     updateFirebaseStatus(true);
@@ -532,7 +528,6 @@ const firebaseConfig = {
         });
     }
 
-    // حفظ التقدم إلى Firebase
     function saveProgressToFirebase() {
         if (!firebaseReady) return;
         database.ref('progress').set(sentState)
@@ -545,13 +540,11 @@ const firebaseConfig = {
             });
     }
 
-    // مزامنة يدوية
     function syncWithFirebase() {
         if (isSyncing) return;
         isSyncing = true;
         showToast('🔄 جاري المزامنة مع السحابة...', 'info');
         
-        // تحميل من Firebase
         database.ref('progress').once('value').then((snapshot) => {
             const data = snapshot.val();
             if (data) {
@@ -564,7 +557,6 @@ const firebaseConfig = {
                 render();
                 showToast('✅ تمت المزامنة بنجاح', 'success');
             } else {
-                // إذا كانت Firebase فارغة، احفظ البيانات المحلية
                 saveProgressToFirebase();
                 showToast('✅ تم رفع التقدم إلى السحابة', 'success');
             }
@@ -576,14 +568,13 @@ const firebaseConfig = {
     }
 
     // ============================================================
-    // 3. دوال الحالة (تم الإرسال) - مع Firebase
+    // 3. دوال الحالة (تم الإرسال)
     // ============================================================
     let sentState = JSON.parse(localStorage.getItem('noorseen_whatsapp_sent') || '{}');
     let batchProgress = JSON.parse(localStorage.getItem('noorseen_batch_progress') || '{"currentIndex":0,"isPaused":false,"isRunning":false}');
     
     function saveSentState() {
         localStorage.setItem('noorseen_whatsapp_sent', JSON.stringify(sentState));
-        // حفظ في Firebase
         saveProgressToFirebase();
     }
     
@@ -1128,13 +1119,12 @@ const firebaseConfig = {
     // ============================================================
     // 14. التشغيل
     // ============================================================
+    // تحميل البيانات ثم تشغيل التطبيق
     loadData().then(() => {
         renderCountryFilters();
         render();
         restoreSession();
     });
-
-    render();
 
     // حفظ التقدم كل 10 ثواني
     setInterval(() => {
