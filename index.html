@@ -425,31 +425,24 @@
     let isSyncing = false;
 
     // ============================================================
-    // 1. تحميل البيانات من Firebase (الخطوة الأولى)
+    // 1. تحميل البيانات من Firebase
     // ============================================================
     let rawData = [];
     let isLoading = true;
 
-    // دالة التحميل الجديدة من Firebase
     async function loadData() {
         try {
             console.log('🔄 بدء الاتصال بقاعدة بيانات Firebase...');
             
-            // نطلب من Firebase أن ترسل لنا البيانات وتستمع لأي تغيير
             database.ref('clients').on('value', (snapshot) => {
                 const data = snapshot.val();
                 
-                // إذا كانت قاعدة البيانات فارغة، نعرض رسالة وننتظر
                 if (!data) {
-                    console.log('⚠️ قاعدة البيانات فارغة حالياً.');
-                    rawData = [];
-                    isLoading = false;
-                    updateFirebaseStatus(true);
-                    render(); // عرض شاشة فارغة
+                    console.log('⚠️ قاعدة البيانات فارغة، جاري نقل البيانات من ملف JSON...');
+                    loadInitialDataFromJSON();
                     return;
                 }
 
-                // تحويل البيانات القادمة من Firebase إلى مصفوفة سهلة التعامل
                 const clientsArray = [];
                 snapshot.forEach(childSnapshot => {
                     clientsArray.push({
@@ -463,11 +456,10 @@
                 firebaseReady = true;
                 updateFirebaseStatus(true);
                 
-                console.log(`✅ تم تحميل ${rawData.length} عميل من Firebase مباشرة`);
-                
-                // تحديث واجهة المستخدم
+                console.log(`✅ تم تحميل ${rawData.length} عميل من Firebase`);
                 render();
                 renderCountryFilters();
+                restoreSession();
                 
             }, (error) => {
                 console.error('❌ خطأ في الاتصال بـ Firebase:', error);
@@ -478,6 +470,37 @@
             
         } catch (error) {
             console.error('❌ خطأ عام في التحميل:', error);
+            isLoading = false;
+        }
+    }
+
+    // دالة مساعدة: تنقل البيانات من ملف JSON إلى Firebase لأول مرة
+    async function loadInitialDataFromJSON() {
+        try {
+            const response = await fetch('data.json');
+            if (!response.ok) throw new Error('فشل تحميل ملف JSON');
+            const jsonData = await response.json();
+            
+            // تحويل البيانات إلى الشكل الذي تفهمه Firebase
+            const updates = {};
+            jsonData.forEach((item, index) => {
+                const id = `client_${index}`;
+                updates[id] = {
+                    country: item.CountryName || 'غير معروف',
+                    phone: String(item['Phone Number'] || ''),
+                    name: `عميل ${item.CountryName || ''}`,
+                    sent: false // حالة أولية
+                };
+            });
+
+            // رفع البيانات إلى Firebase
+            await database.ref('clients').update(updates);
+            console.log('✅ تم رفع البيانات الأولية إلى Firebase بنجاح');
+            showToast(`✅ تم تحميل ${jsonData.length} عميل إلى قاعدة البيانات!`, 'success');
+            
+        } catch (error) {
+            console.error('❌ خطأ أثناء رفع البيانات الأولية:', error);
+            showToast('❌ فشل في رفع البيانات الأولية', 'error');
             isLoading = false;
         }
     }
@@ -585,8 +608,23 @@
     }
 
     function toggleSent(id) {
-        sentState[id] = !sentState[id];
-        saveSentState();
+        // عكس الحالة الحالية
+        const newState = !sentState[id];
+        sentState[id] = newState;
+        saveSentState(); // يحفظ في LocalStorage و progress في Firebase
+
+        // تحديث حالة العميل في جدول clients نفسه ليتم التزامن فوراً
+        if (firebaseReady) {
+            database.ref(`clients/${id}/sent`).set(newState)
+                .then(() => {
+                    console.log(`✅ تم تحديث حالة العميل ${id} في Firebase`);
+                })
+                .catch((err) => {
+                    console.error('❌ فشل تحديث حالة العميل في Firebase:', err);
+                    updateFirebaseStatus(false);
+                });
+        }
+
         render();
     }
 
@@ -618,10 +656,9 @@
     // 6. دوال التصفية
     // ============================================================
     function getFilteredData() {
-        let data = rawData.map((item, index) => ({
+        let data = rawData.map((item) => ({
             ...item,
-            _id: item.id || `client_${index}`,
-            _sent: isSent(item.id || `client_${index}`)
+            _sent: isSent(item.id)
         }));
 
         if (currentCountry !== 'all') {
@@ -656,7 +693,7 @@
                     <div class="w-20 h-20 bg-green-light rounded-full flex items-center justify-center mx-auto mb-4">
                         <i class="fa-solid fa-spinner fa-spin text-3xl text-sky-blue"></i>
                     </div>
-                    <p class="text-lg font-bold text-slate-600">جاري الاتصال بقاعدة البيانات...</p>
+                    <p class="text-lg font-bold text-slate-600">جاري تحميل البيانات...</p>
                     <p class="text-sm text-slate-400">يرجى الانتظار</p>
                 </div>
             `;
@@ -694,8 +731,8 @@
                     <div class="w-20 h-20 bg-green-light rounded-full flex items-center justify-center mx-auto mb-4">
                         <i class="fa-regular fa-face-smile text-3xl text-sky-blue"></i>
                     </div>
-                    <p class="text-lg font-bold text-slate-600">لا توجد نتائج أو قاعدة البيانات فارغة</p>
-                    <p class="text-sm text-slate-400">انتظر حتى يتم تحميل البيانات أو قم بإضافة عملاء</p>
+                    <p class="text-lg font-bold text-slate-600">لا توجد نتائج</p>
+                    <p class="text-sm text-slate-400">حاول تعديل البحث أو الفلترة</p>
                 </div>
             `;
         } else {
@@ -831,6 +868,10 @@
         if (!sentState[id]) {
             sentState[id] = true;
             saveSentState();
+            // تحديث Firebase فوراً
+            if (firebaseReady) {
+                database.ref(`clients/${id}/sent`).set(true).catch(err => console.error(err));
+            }
             setTimeout(() => render(), 500);
         }
     }
@@ -1119,6 +1160,9 @@
     // ============================================================
     // تحميل البيانات من Firebase
     loadData();
+    
+    // تحميل حالة التقدم من Firebase
+    loadProgressFromFirebase();
 
     // حفظ التقدم كل 10 ثواني
     setInterval(() => {
