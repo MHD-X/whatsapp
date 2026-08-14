@@ -448,6 +448,8 @@
                 
                 // تحميل التقدم من Firebase
                 loadProgressFromFirebase();
+                // ✅ بدء الاستماع للتغييرات التلقائية
+                listenForChanges();
                 
                 render();
                 renderCountryFilters();
@@ -528,12 +530,11 @@
 
     function loadProgressFromFirebase() {
         return new Promise((resolve) => {
-            database.ref('progress').on('value', (snapshot) => {
+            database.ref('progress').once('value', (snapshot) => {
                 const data = snapshot.val();
-                console.log('📥 تحديث من Firebase:', data);
+                console.log('📥 بيانات التقدم من Firebase:', data);
                 
                 if (data) {
-                    // تحديث الحالة المحلية من Firebase
                     let hasChanges = false;
                     Object.keys(data).forEach(key => {
                         if (data[key] === true && !sentState[key]) {
@@ -544,7 +545,6 @@
                     if (hasChanges) {
                         saveSentState();
                         render();
-                        showToast('🔄 تم تحديث التقدم من السحابة', 'info');
                     }
                 }
                 firebaseReady = true;
@@ -558,18 +558,54 @@
         });
     }
 
+    // ✅ الاستماع للتغييرات في الوقت الفعلي (التحديث التلقائي)
+    function listenForChanges() {
+        console.log('🔄 بدء الاستماع للتغييرات من Firebase...');
+        
+        database.ref('progress').on('value', (snapshot) => {
+            const data = snapshot.val();
+            console.log('📥 تحديث تلقائي من Firebase:', data);
+            
+            if (data) {
+                let hasChanges = false;
+                Object.keys(data).forEach(key => {
+                    // إذا كانت الحالة في Firebase مختلفة عن الحالة المحلية
+                    if (data[key] === true && !sentState[key]) {
+                        sentState[key] = true;
+                        hasChanges = true;
+                    } else if (data[key] === false && sentState[key] === true) {
+                        // إذا تم إلغاء التحديد في Firebase
+                        sentState[key] = false;
+                        hasChanges = true;
+                    }
+                });
+                
+                if (hasChanges) {
+                    saveSentState();
+                    render();
+                    showToast('🔄 تم تحديث التقدم تلقائياً من جهاز آخر', 'info');
+                }
+            }
+            firebaseReady = true;
+            updateFirebaseStatus(true);
+            
+        }, (error) => {
+            console.error('❌ خطأ في الاستماع للتغييرات:', error);
+            updateFirebaseStatus(false);
+        });
+    }
+
     function syncWithFirebase() {
         if (isSyncing) return;
         isSyncing = true;
         showToast('🔄 جاري المزامنة مع السحابة...', 'info');
         
-        // تحميل من Firebase
+        // ✅ استخدام once بدلاً من on للتحديث اليدوي
         database.ref('progress').once('value').then((snapshot) => {
             const data = snapshot.val();
             console.log('📥 بيانات من Firebase:', data);
             
             if (data) {
-                // تحديث الحالة المحلية
                 let hasChanges = false;
                 Object.keys(data).forEach(key => {
                     if (data[key] === true && !sentState[key]) {
@@ -585,7 +621,6 @@
                     showToast('✅ لا توجد تغييرات جديدة', 'info');
                 }
             } else {
-                // إذا كانت Firebase فارغة، احفظ البيانات المحلية
                 saveProgressToFirebase();
                 showToast('✅ تم رفع التقدم إلى السحابة', 'success');
             }
