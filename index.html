@@ -392,6 +392,9 @@
 </footer>
 
 <script>
+    // ============================================================
+    // 1. إعداد Firebase
+    // ============================================================
     const firebaseConfig = {
         apiKey: "AIzaSyAAM8ehkF8ofuIAn5WxvWQFJgQfbyQwmrU",
         authDomain: "whatsapp-clients.firebaseapp.com",
@@ -408,6 +411,9 @@
     let firebaseReady = false;
     let isSyncing = false;
 
+    // ============================================================
+    // 2. تحميل البيانات من Firebase أو JSON
+    // ============================================================
     let rawData = [];
     let isLoading = true;
 
@@ -415,6 +421,7 @@
         try {
             console.log('🔄 بدء الاتصال بقاعدة بيانات Firebase...');
             
+            // محاولة تحميل البيانات من Firebase أولاً
             database.ref('clients').on('value', (snapshot) => {
                 const data = snapshot.val();
                 
@@ -438,6 +445,10 @@
                 updateFirebaseStatus(true);
                 
                 console.log(`✅ تم تحميل ${rawData.length} عميل من Firebase`);
+                
+                // تحميل التقدم من Firebase
+                loadProgressFromFirebase();
+                
                 render();
                 renderCountryFilters();
                 restoreSession();
@@ -496,16 +507,106 @@
     }
 
     // ============================================================
-    // ** التعديل الجديد هنا: سنقوم بإزالة الحفظ التلقائي في Firebase **
-    // بحيث يتم الحفظ في المتصفح (LocalStorage) فقط.
+    // 3. دوال المزامنة مع Firebase
     // ============================================================
+    
+    function saveProgressToFirebase() {
+        if (!firebaseReady) {
+            console.warn('⚠️ Firebase غير جاهز للحفظ');
+            return;
+        }
+        
+        database.ref('progress').set(sentState)
+            .then(() => {
+                console.log('✅ تم حفظ التقدم في Firebase');
+            })
+            .catch((err) => {
+                console.error('❌ خطأ في حفظ Firebase:', err);
+                updateFirebaseStatus(false);
+            });
+    }
 
+    function loadProgressFromFirebase() {
+        return new Promise((resolve) => {
+            database.ref('progress').on('value', (snapshot) => {
+                const data = snapshot.val();
+                console.log('📥 تحديث من Firebase:', data);
+                
+                if (data) {
+                    // تحديث الحالة المحلية من Firebase
+                    let hasChanges = false;
+                    Object.keys(data).forEach(key => {
+                        if (data[key] === true && !sentState[key]) {
+                            sentState[key] = true;
+                            hasChanges = true;
+                        }
+                    });
+                    if (hasChanges) {
+                        saveSentState();
+                        render();
+                        showToast('🔄 تم تحديث التقدم من السحابة', 'info');
+                    }
+                }
+                firebaseReady = true;
+                updateFirebaseStatus(true);
+                resolve();
+            }, (error) => {
+                console.error('❌ Firebase error:', error);
+                updateFirebaseStatus(false);
+                resolve();
+            });
+        });
+    }
+
+    function syncWithFirebase() {
+        if (isSyncing) return;
+        isSyncing = true;
+        showToast('🔄 جاري المزامنة مع السحابة...', 'info');
+        
+        // تحميل من Firebase
+        database.ref('progress').once('value').then((snapshot) => {
+            const data = snapshot.val();
+            console.log('📥 بيانات من Firebase:', data);
+            
+            if (data) {
+                // تحديث الحالة المحلية
+                let hasChanges = false;
+                Object.keys(data).forEach(key => {
+                    if (data[key] === true && !sentState[key]) {
+                        sentState[key] = true;
+                        hasChanges = true;
+                    }
+                });
+                if (hasChanges) {
+                    saveSentState();
+                    render();
+                    showToast('✅ تمت المزامنة بنجاح', 'success');
+                } else {
+                    showToast('✅ لا توجد تغييرات جديدة', 'info');
+                }
+            } else {
+                // إذا كانت Firebase فارغة، احفظ البيانات المحلية
+                saveProgressToFirebase();
+                showToast('✅ تم رفع التقدم إلى السحابة', 'success');
+            }
+            isSyncing = false;
+        }).catch((error) => {
+            console.error('❌ خطأ في المزامنة:', error);
+            showToast('❌ خطأ في المزامنة: ' + error.message, 'error');
+            isSyncing = false;
+        });
+    }
+
+    // ============================================================
+    // 4. دوال الحالة (تم الإرسال)
+    // ============================================================
     let sentState = JSON.parse(localStorage.getItem('noorseen_whatsapp_sent') || '{}');
     let batchProgress = JSON.parse(localStorage.getItem('noorseen_batch_progress') || '{"currentIndex":0,"isPaused":false,"isRunning":false}');
     
     function saveSentState() {
         localStorage.setItem('noorseen_whatsapp_sent', JSON.stringify(sentState));
-        // حذفنا أمر الحفظ في Firebase من هنا ليعطيك التحكم الكامل بالإلغاء
+        // ✅ حفظ في Firebase أيضاً
+        saveProgressToFirebase();
     }
     
     function saveBatchProgress() {
@@ -517,16 +618,14 @@
     }
 
     function toggleSent(id) {
-        // هذا السطر يقوم بقلب الحالة (إذا كان صح يصبح خطأ والعكس)
         sentState[id] = !sentState[id];
         saveSentState();
         render();
     }
 
     // ============================================================
-    // باقي الدوال كما هي...
+    // 5. إعدادات العرض
     // ============================================================
-
     const ITEMS_PER_PAGE = 24;
     let currentPage = 1;
     let currentFilter = 'all';
@@ -537,6 +636,9 @@
 
     const defaultMessage = 'مرحباً [الاسم]، يتواصل معك مركز نورسين المتطور. لدينا عرض خاص لك في دولة [الدولة]!';
 
+    // ============================================================
+    // 6. متغيرات الإرسال الجماعي
+    // ============================================================
     let batchTimer = null;
     let isBatchRunning = false;
     let isBatchPaused = false;
@@ -545,6 +647,9 @@
     let currentClientIndex = 0;
     let batchFilteredData = [];
 
+    // ============================================================
+    // 7. دوال التصفية
+    // ============================================================
     function getFilteredData() {
         let data = rawData.map((item) => ({
             ...item,
@@ -573,6 +678,9 @@
         return data;
     }
 
+    // ============================================================
+    // 8. العرض الرئيسي
+    // ============================================================
     function render() {
         if (isLoading) {
             document.getElementById('cardsContainer').innerHTML = `
@@ -686,6 +794,9 @@
         updateBatchStatus();
     }
 
+    // ============================================================
+    // 9. الترقيم
+    // ============================================================
     function renderPagination(totalPages) {
         const controls = document.getElementById('paginationControls');
         if (totalPages <= 1) {
@@ -731,6 +842,9 @@
         render();
     }
 
+    // ============================================================
+    // 10. دوال مساعدة
+    // ============================================================
     function copyPhone(phone) {
         navigator.clipboard.writeText(phone).then(() => {
             showToast('✅ تم نسخ الرقم: ' + phone, 'success');
@@ -769,6 +883,9 @@
         }, 4000);
     }
 
+    // ============================================================
+    // 11. إدارة الرسالة
+    // ============================================================
     let messageTemplate = localStorage.getItem('noorseen_whatsapp_msg') || defaultMessage;
     const msgInput = document.getElementById('messageTemplate');
     msgInput.value = messageTemplate;
@@ -787,6 +904,9 @@
         showToast('🔄 تم استعادة الرسالة الافتراضية', 'warning');
     }
 
+    // ============================================================
+    // 12. الإرسال الجماعي
+    // ============================================================
     function startBatchSending() {
         const filtered = getFilteredData();
         const pending = filtered.filter(item => !item._sent);
@@ -951,6 +1071,9 @@
         }
     }
 
+    // ============================================================
+    // 13. استعادة الجلسة
+    // ============================================================
     function restoreSession() {
         if (isLoading || rawData.length === 0) return;
         
@@ -968,6 +1091,9 @@
         }
     }
 
+    // ============================================================
+    // 14. البحث والفلترة
+    // ============================================================
     document.getElementById('searchInput').addEventListener('input', function() {
         searchQuery = this.value;
         currentPage = 1;
@@ -1020,6 +1146,9 @@
         });
     });
 
+    // ============================================================
+    // 15. التشغيل
+    // ============================================================
     loadData();
 
     setInterval(() => {
